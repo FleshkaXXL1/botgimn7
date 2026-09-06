@@ -231,20 +231,52 @@ def days_until_birthday(birthday_str):
         return None, None
 
 def get_current_lesson():
-    now = datetime.now().time()
-    lesson_times = [(8,0), (8,55), (9,55), (10,55), (11,50), (12,55), (13,50), (14,50)]
-    lesson_ends = [(8,45), (9,40), (10,40), (11,40), (12,35), (13,40), (14,35), (15,35)]
+    from datetime import timezone, timedelta
+    # Получаем точное время по МСК (UTC+3)
+    now = datetime.now(timezone(timedelta(hours=3))).time()
     current_minutes = now.hour * 60 + now.minute
-    for i in range(8):
-        start_min = lesson_times[i][0] * 60 + lesson_times[i][1]
-        end_min = lesson_ends[i][0] * 60 + lesson_ends[i][1]
-        if start_min <= current_minutes <= end_min:
-            return i + 1, "идет"
-        elif start_min > current_minutes:
-            return i + 1, "еще не начался"
-    if current_minutes > lesson_ends[7][0] * 60 + lesson_ends[7][1]:
-        return None, "уроки закончились"
-    return None, "уроков нет"
+
+    # Точное расписание уроков (в минутах от начала суток)
+    # 1 урок: 8:00 - 8:45
+    # 2 урок: 8:55 - 9:40
+    # 3 урок: 9:55 - 10:40
+    # 4 урок: 11:00 - 11:45 (перемена после 3 урока — 20 минут!)
+    # 5 урок: 11:55 - 12:40
+    # 6 урок: 12:50 - 13:35
+    # 7 урок: 13:45 - 14:30
+    # 8 урок: 14:40 - 15:25
+    lessons = [
+        {"num": 1, "start": 8*60+0,  "end": 8*60+45},
+        {"num": 2, "start": 8*60+55, "end": 9*60+40},
+        {"num": 3, "start": 9*60+55, "end": 10*60+40},
+        {"num": 4, "start": 11*60+0, "end": 11*60+45},
+        {"num": 5, "start": 11*60+55, "end": 12*60+40},
+        {"num": 6, "start": 12*60+50, "end": 13*60+35},
+        {"num": 7, "start": 13*60+45, "end": 14*60+30},
+        {"num": 8, "start": 14*60+40, "end": 15*60+25}
+    ]
+
+    # Если уроки еще вообще не начались
+    if current_minutes < lessons[0]["start"]:
+        return None, "уроки еще не начались"
+
+    # Проверяем каждый урок и перемену
+    for i, les in enumerate(lessons):
+        # Если время попадает в интервал урока
+        if les["start"] <= current_minutes <= les["end"]:
+            return les["num"], "идет"
+        
+        # Если время между текущим и следующим уроком (перемена)
+        if i < len(lessons) - 1:
+            next_les = lessons[i+1]
+            if les["end"] < current_minutes < next_les["start"]:
+                # Если это перемена после 3-го урока (между 3 и 4)
+                if les["num"] == 3:
+                    return les["num"], "перемена (большая, 20 минут)"
+                else:
+                    return les["num"], "перемена (10 минут)"
+
+    return None, "уроки закончились"
 
 def get_next_holiday():
     today = datetime.now()
