@@ -410,7 +410,6 @@ async def show_olympiad(message: Message, state: FSMContext):
     for item in OLYMPIAD_SCHEDULE:
         text += f"📌 {item['date']}: {item['subjects']}\n"
     text += "\n\n⚠️ Практический тур по физкультуре - отдельно"
-    text += "\n📝 Результаты: olymp.informatics.ru"
     kb = admin_kb if is_admin(message.from_user.id) else main_kb
     await message.answer(text, reply_markup=kb)
 
