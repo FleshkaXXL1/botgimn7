@@ -1105,9 +1105,52 @@ async def show_results(callback: CallbackQuery):
         logger.error(f"Results error [{callback.from_user.id}]: {e}")
         await callback.answer("Ошибка", show_alert=True)
 
+async def check_birthdays_daily():
+    """Фоновая задача: проверяет дни рождения каждый день в 09:00 по МСК"""
+    while True:
+        try:
+            now = get_msk_now()
+            # Считаем время до ближайших 9 утра по Москве
+            target_time = now.replace(hour=9, minute=0, second=0, microsecond=0)
+            if now >= target_time:
+                target_time += timedelta(days=1)
+            
+            seconds_to_wait = (target_time - now).total_seconds()
+            logger.info(f"⏳ Таймер дней рождения запущен. До проверки осталось {seconds_to_wait/3600:.1f} ч.")
+            await asyncio.sleep(seconds_to_wait)
+            
+            # Наступило 9 утра — проверяем БД
+            current_date_str = get_msk_now().strftime("%d.%m")
+            
+            cursor_check = conn.cursor()
+            cursor_check.execute("SELECT user_id FROM users WHERE birthday = ?", (current_date_str,))
+            birthday_boys = cursor_check.fetchall()
+            
+            for row in birthday_boys:
+                user_id = row[0]
+                try:
+                    await bot.send_message(
+                        user_id, 
+                        "🎉 **С ДНЁМ РОЖДЕНИЯ!** 🥳\n\n"
+                        "Весь наш школьный парламент «Новое Поколение» поздравляет тебя! "
+                        "Желаем крутого настроения, верных друзей и лёгкой учёбы! Ты делаешь нашу школу лучше! 💖"
+                    )
+                    logger.info(f"🎂 Поздравление успешно отправлено пользователю [{user_id}]")
+                except Exception as e:
+                    logger.error(f"⚠️ Не удалось поздравить [{user_id}]: {e}")
+                    
+        except Exception as e:
+            logger.error(f"🚨 Ошибка в фоновом таймере ДР: {e}")
+            await asyncio.sleep(60)
+
+# Обновленный запуск бота с таймером
 async def main():
     logger.info("🚀 Бот парламента «Новое Поколение» запущен!")
     logger.info(f"📊 Администраторы: {ADMIN_IDS}")
+    
+    # Включаем отсчет и проверку ДР
+    asyncio.create_task(check_birthdays_daily())
+    
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
@@ -1115,8 +1158,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("👋 Бот остановлен")
-        input()
-    except Exception as e:
-        logger.error(f"❌ Ошибка: {e}")
-        traceback.print_exc()
         input()
