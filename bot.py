@@ -220,58 +220,57 @@ def log_callback(callback):
 
 def days_until_birthday(birthday_str):
     try:
+        # Автоматически заменяем запятую на точку, если ты ошибся
+        birthday_str = birthday_str.replace(",", ".").replace(" ", "")
         birth_date = datetime.strptime(birthday_str, "%d.%m")
-        today = datetime.now()
+        today = get_msk_now().replace(tzinfo=None)
         birth_this_year = datetime(today.year, birth_date.month, birth_date.day)
         if birth_this_year < today:
             birth_this_year = datetime(today.year + 1, birth_date.month, birth_date.day)
         days = (birth_this_year - today).days
         return days, birth_this_year
-    except:
+    except Exception as e:
+        logger.error(f"Ошибка даты рождения: {e}")
         return None, None
 
 def get_current_lesson():
-    from datetime import timezone, timedelta
-    # Получаем точное время по МСК (UTC+3)
-    now = datetime.now(timezone(timedelta(hours=3))).time()
-    current_minutes = now.hour * 60 + now.minute
+    try:
+        now = get_msk_now().time()
+        current_minutes = now.hour * 60 + now.minute
 
-    # Точное расписание уроков (переведено в минуты от начала дня)
-    lessons = [
-        {"num": 1, "start": 8*60+0,  "end": 8*60+45},   # 8:00 - 8:45
-        {"num": 2, "start": 8*60+55, "end": 9*60+40},   # 8:55 - 9:40
-        {"num": 3, "start": 9*60+55, "end": 10*60+40},  # 9:55 - 10:40
-        {"num": 4, "start": 10*60+55, "end": 11*60+40}, # 10:55 - 11:40
-        {"num": 5, "start": 11*60+50, "end": 12*60+35}, # 11:50 - 12:35
-        {"num": 6, "start": 12*60+55, "end": 13*60+40}, # 12:55 - 13:40
-        {"num": 7, "start": 13*60+50, "end": 14*60+35}, # 13:50 - 14:35
-        {"num": 8, "start": 14*60+50, "end": 15*60+35}  # 14:50 - 15:35
-    ]
+        lessons = [
+            {"num": 1, "start": 8*60+0,  "end": 8*60+45},   # 8:00 - 8:45
+            {"num": 2, "start": 8*60+55, "end": 9*60+40},   # 8:55 - 9:40
+            {"num": 3, "start": 9*60+55, "end": 10*60+40},  # 9:55 - 10:40
+            {"num": 4, "start": 10*60+55, "end": 11*60+40}, # 10:55 - 11:40
+            {"num": 5, "start": 11*60+50, "end": 12*60+35}, # 11:50 - 12:35
+            {"num": 6, "start": 12*60+55, "end": 13*60+40}, # 12:55 - 13:40
+            {"num": 7, "start": 13*60+50, "end": 14*60+35}, # 13:50 - 14:35
+            {"num": 8, "start": 14*60+50, "end": 15*60+35}  # 14:50 - 15:35
+        ]
 
-    # Если уроки еще вообще не начались
-    if current_minutes < lessons[0]["start"]:
-        return None, "уроки еще не начались"
+        if current_minutes < lessons[0]["start"]:
+            return None, "уроки еще не начались"
 
-    # Проверяем каждый урок и перемену
-    for i, les in enumerate(lessons):
-        # Если время попадает в интервал урока
-        if les["start"] <= current_minutes <= les["end"]:
-            return les["num"], "идет"
-        
-        # Если время между текущим и следующим уроком (перемена)
-        if i < len(lessons) - 1:
-            next_les = lessons[i+1]
-            if les["end"] < current_minutes < next_les["start"]:
-                break_len = next_les["start"] - les["end"]
-                if break_len == 20:
-                    return les["num"], "перемена (большая, 20 минут)"
-                elif break_len == 15:
-                    return les["num"], "перемена (15 минут)"
-                else:
-                    return les["num"], "перемена (10 минут)"
+        for i, les in enumerate(lessons):
+            if les["start"] <= current_minutes <= les["end"]:
+                return les["num"], "идет"
+            
+            if i < len(lessons) - 1:
+                next_les = lessons[i+1]
+                if les["end"] < current_minutes < next_les["start"]:
+                    break_len = next_les["start"] - les["end"]
+                    if break_len == 20:
+                        return les["num"], "перемена (большая, 20 минут)"
+                    elif break_len == 15:
+                        return les["num"], "перемена (15 минут)"
+                    else:
+                        return les["num"], "перемена (10 минут)"
 
-    return None, "уроки закончились"
-
+        return None, "уроки закончились"
+    except Exception as e:
+        logger.error(f"Ошибка времени уроков: {e}")
+        return None, "уроки закончились"
 
 def get_next_holiday():
     today = datetime.now()
